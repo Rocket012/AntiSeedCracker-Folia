@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.plugin.Plugin;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -55,25 +56,39 @@ public class FoliaScheduler {
     }
 
     private static CancellableTask runAtLocationTimerFolia(Plugin plugin, Location location, Consumer<CancellableTask> task, long initialDelay, long period) {
-        AtomicReference<io.papermc.paper.threadedregions.scheduler.ScheduledTask> scheduledTaskRef = new AtomicReference<>();
+        AtomicReference<Object> scheduledTaskRef = new AtomicReference<>();
         CancellableTask cancellableTask = new CancellableTask() {
             @Override
             public void cancel() {
-                io.papermc.paper.threadedregions.scheduler.ScheduledTask scheduledTask = scheduledTaskRef.get();
+                Object scheduledTask = scheduledTaskRef.get();
                 if (scheduledTask != null) {
-                    scheduledTask.cancel();
+                    try {
+                        Method cancelMethod = scheduledTask.getClass().getMethod("cancel");
+                        cancelMethod.invoke(scheduledTask);
+                    } catch (NoSuchMethodException e) {
+                        throw new RuntimeException("Failed to cancel Folia scheduled task: cancel method not found", e);
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to cancel Folia scheduled task: invocation error", e);
+                    }
                 }
             }
         };
 
-        io.papermc.paper.threadedregions.scheduler.ScheduledTask scheduledTask = Bukkit.getRegionScheduler().runAtFixedRate(
-                plugin,
-                location,
-                t -> task.accept(cancellableTask),
-                initialDelay,
-                period
-        );
-        scheduledTaskRef.set(scheduledTask);
+        try {
+            // Get the RegionScheduler via reflection: Bukkit.getRegionScheduler()
+            Method getRegionSchedulerMethod = Bukkit.class.getMethod("getRegionScheduler");
+            Object regionScheduler = getRegionSchedulerMethod.invoke(null);
+
+            // Get the runAtFixedRate method and invoke it
+            // Signature: ScheduledTask runAtFixedRate(Plugin plugin, Location location, Consumer<ScheduledTask> task, long initialDelayTicks, long periodTicks)
+            Method runAtFixedRateMethod = regionScheduler.getClass().getMethod("runAtFixedRate", Plugin.class, Location.class, Consumer.class, long.class, long.class);
+            Object scheduledTask = runAtFixedRateMethod.invoke(regionScheduler, plugin, location, (Consumer<?>) t -> task.accept(cancellableTask), initialDelay, period);
+            scheduledTaskRef.set(scheduledTask);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException("Failed to schedule Folia task: method not found - " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to schedule Folia task: invocation error - " + e.getMessage(), e);
+        }
 
         return cancellableTask;
     }
