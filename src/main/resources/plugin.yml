@@ -5,6 +5,7 @@ api-version: 1.20
 authors: [Gadse]
 description: Modifies the hashed seed sent to clients upon joining to make cracking the seed of your world harder
 depend: ["ProtocolLib"]
+folia-supported: true
 
 commands:
   antiseedcracker:

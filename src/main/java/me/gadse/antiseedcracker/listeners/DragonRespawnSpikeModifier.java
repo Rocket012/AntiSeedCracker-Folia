@@ -1,6 +1,7 @@
 package me.gadse.antiseedcracker.listeners;
 
 import me.gadse.antiseedcracker.AntiSeedCracker;
+import me.gadse.antiseedcracker.util.FoliaScheduler;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -46,7 +47,9 @@ public class DragonRespawnSpikeModifier implements Listener {
         world.getPersistentDataContainer().set(plugin.getModifiedSpike(), PersistentDataType.BOOLEAN, false);
 
         taskScheduled = true;
-        plugin.getServer().getScheduler().runTaskTimer(plugin, task -> {
+        // Location at the End portal (0, 65, 0) for region-based scheduling in Folia
+        Location portalLocation = new Location(world, 0, 65, 0);
+        FoliaScheduler.runAtLocationTimer(plugin, portalLocation, task -> {
             DragonBattle dragonBattle = world.getEnderDragonBattle();
             if (dragonBattle == null) {
                 // Fall-back, should not be reachable.
